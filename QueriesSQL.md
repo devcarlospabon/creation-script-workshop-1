@@ -19,7 +19,18 @@ order by sum(c2.saldo) desc;
 
 **Consulta SQL:**
 ```sql
-
+select c1.nombre,c1.cedula, ob1.total as total_deposito , ob2.total as total_retiro from cliente c1 
+left join (select c.id_cliente ,SUM(t.monto) as total from cliente c 
+join cuenta c2 on c.id_cliente =c2.id_cliente
+join transaccion t on c2.num_cuenta =t.num_cuenta
+where t.tipo_transaccion ='deposito'
+group by c.id_cliente) ob1 on c1.id_cliente =ob1.id_cliente
+left join (select c.id_cliente ,SUM(t.monto) as total from cliente c 
+join cuenta c2 on c.id_cliente =c2.id_cliente
+join transaccion t on c2.num_cuenta =t.num_cuenta
+where t.tipo_transaccion ='retiro'
+group by c.id_cliente) ob2 on c1.id_cliente =ob2.id_cliente
+where ob1.total is not null or ob2.total is not null;
 ```
 
 ## Enunciado 3: Cuentas sin tarjetas asociadas
