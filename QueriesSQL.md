@@ -28,7 +28,9 @@ order by sum(c2.saldo) desc;
 
 **Consulta SQL:**
 ```sql
-
+select c2.nombre as cliente ,c.num_cuenta from cuenta c 
+join cliente c2 on c2.id_cliente = c.id_cliente
+where c.num_cuenta not in (select distinct t.num_cuenta from tarjeta t);
 ```
 
 ## Enunciado 4: Análisis de saldos promedio por tipo de cuenta y comportamiento transaccional
@@ -37,7 +39,16 @@ order by sum(c2.saldo) desc;
 
 **Consulta SQL:**
 ```sql
-
+select (select AVG(c2.saldo) as promedio FROM cuenta c2 
+join transaccion t on c2.num_cuenta =t.num_cuenta
+where c2.tipo_cuenta  ='ahorro' 
+and t.fecha between (now() - INTERVAL '30 days') AND now() 
+) as promedio_ahorro,
+(select AVG(c2.saldo) as promedio FROM cuenta c2 
+join transaccion t on c2.num_cuenta =t.num_cuenta
+where c2.tipo_cuenta  ='corriente' 
+and t.fecha between (now() - INTERVAL '30 days') AND now()
+) as promedio_corriente;
 ```
 
 ## Enunciado 5: Clientes con transferencias pero sin retiros en cajeros
@@ -46,5 +57,13 @@ order by sum(c2.saldo) desc;
 
 **Consulta SQL:**
 ```sql
-
+select distinct c.id_cliente ,c.nombre ,c.cedula from cliente c 
+where c.id_cliente in (select c.id_cliente from cliente c 
+join cuenta c2 on c.id_cliente =c2.id_cliente
+join transaccion t on c2.num_cuenta =t.num_cuenta 
+where t.tipo_transaccion ='transferencia' 
+except select c.id_cliente from cliente c 
+join cuenta c2 on c.id_cliente =c2.id_cliente
+join transaccion t on c2.num_cuenta =t.num_cuenta 
+where t.descripcion ='Retiro en cajero') ;
 ```
