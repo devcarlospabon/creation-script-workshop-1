@@ -8,6 +8,30 @@ A continuación se presentan 5 enunciados de consultas basados en las coleccione
 
 **Consulta MongoDB:**
 ```javascript
+db.Clientes.aggregate([
+  { 
+    $unwind: "$cuentas" 
+  },
+  { 
+    $group: {
+      _id: "$cuentas.tipo_cuenta", 
+      saldo_total: { $sum: "$cuentas.saldo" }, 
+      saldo_promedio: { $avg: "$cuentas.saldo" }, 
+      saldo_maximo: { $max: "$cuentas.saldo" }, 
+      saldo_minimo: { $min: "$cuentas.saldo" }  
+    }
+  },
+  { 
+    $project: {
+      tipo_cuenta: "$_id", 
+      _id: 0, 
+      saldo_total: 1,
+      saldo_promedio: 1,
+      saldo_maximo: 1,
+      saldo_minimo: 1
+    }
+  }
+]);
 ```
 
 ## 2. Patrones de Transacciones por Cliente
@@ -16,6 +40,37 @@ A continuación se presentan 5 enunciados de consultas basados en las coleccione
 
 **Consulta MongoDB:**
 ```javascript
+db.Transacciones.aggregate([
+  {
+    $group: {
+      _id: {
+        cliente: "$cliente_ref", 
+        tipo_transaccion: "$tipo_transaccion" 
+      },
+      cantidad_transacciones: { $sum: 1 }, 
+      monto_total: { $sum: "$monto" } 
+    }
+  },
+  {
+    $group: {
+      _id: "$_id.cliente", 
+      transacciones_por_tipo: {
+        $push: {
+          tipo_transaccion: "$_id.tipo_transaccion",
+          cantidad_transacciones: "$cantidad_transacciones",
+          monto_total: "$monto_total"
+        }
+      }
+    }
+  },
+  {
+    $project: {
+      cliente: "$_id", 
+      _id: 0, 
+      transacciones_por_tipo: 1
+    }
+  }
+]);
 ```
 
 ## 3. Clientes con Múltiples Tarjetas de Crédito
@@ -24,6 +79,42 @@ A continuación se presentan 5 enunciados de consultas basados en las coleccione
 
 **Consulta MongoDB:**
 ```javascript
+db.Clientes.aggregate([
+  {
+    $unwind: "$cuentas" 
+  },
+  {
+    $unwind: "$cuentas.tarjetas" 
+  },
+  {
+    $match: { "cuentas.tarjetas.tipo_tarjeta": "credito" } 
+  },
+  {
+    $group: {
+      _id: "$_id", 
+      nombre: { $first: "$nombre" }, 
+      cedula: { $first: "$cedula" }, 
+      correo: { $first: "$correo" }, 
+      direccion: { $first: "$direccion" }, 
+      cantidad_tarjetas: { $sum: 1 }, 
+      detalle_tarjetas: { $push: "$cuentas.tarjetas" } 
+    }
+  },
+  {
+    $match: { cantidad_tarjetas: { $gt: 1 } } 
+  },
+  {
+    $project: {
+      _id: 0, 
+      nombre: 1,
+      cedula: 1,
+      correo: 1,
+      direccion: 1,
+      cantidad_tarjetas: 1,
+      detalle_tarjetas: 1
+    }
+  }
+]);
 ```
 
 ## 4. Análisis de Medios de Pago más Utilizados
@@ -32,6 +123,41 @@ A continuación se presentan 5 enunciados de consultas basados en las coleccione
 
 **Consulta MongoDB:**
 ```javascript
+db.Transacciones.aggregate([
+  {
+    $match: { tipo_transaccion: "deposito" } 
+  },
+  {
+    $group: {
+      _id: {
+        mes: { $month: { $dateFromString: { dateString: "$fecha" } } }, 
+        medio_pago: "$detalles_deposito.medio_pago" 
+      },
+      cantidad: { $sum: 1 } 
+    }
+  },
+  {
+    $group: {
+      _id: "$_id.mes", 
+      medios_pago: {
+        $push: {
+          medio_pago: "$_id.medio_pago",
+          cantidad: "$cantidad"
+        }
+      }
+    }
+  },
+  {
+    $project: {
+      mes: "$_id", 
+      _id: 0, 
+      medios_pago: 1
+    }
+  },
+  {
+    $sort: { mes: 1 } 
+  }
+]);
 ```
 
 ## 5. Detección de Cuentas con Transacciones Sospechosas
@@ -40,4 +166,34 @@ A continuación se presentan 5 enunciados de consultas basados en las coleccione
 
 **Consulta MongoDB:**
 ```javascript
+db.Transacciones.aggregate([
+  {
+    $match: { tipo_transaccion: "retiro" } 
+  },
+  {
+    $group: {
+      _id: {
+        num_cuenta: "$num_cuenta", 
+        dia: { $dateToString: { format: "%Y-%m-%d", date: { $dateFromString: { dateString: "$fecha" } } } } 
+      },
+      cantidad_retiros: { $sum: 1 }, 
+      monto_total: { $sum: "$monto" } 
+    }
+  },
+  {
+    $match: {
+      cantidad_retiros: { $gt: 3 }, 
+      monto_total: { $gt: 1000000 } 
+    }
+  },
+  {
+    $project: {
+      _id: 0, 
+      num_cuenta: "$_id.num_cuenta", 
+      dia: "$_id.dia", 
+      cantidad_retiros: 1,
+      monto_total: 1
+    }
+  }
+]);
 ```
